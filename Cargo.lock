@@ -889,20 +889,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "egui_imdock"
-version = "0.1.0"
-dependencies = [
- "eframe",
- "egui",
-]
-
-[[package]]
 name = "emath"
 version = "0.34.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0a05cd8bdf3b598488c627ca97c7fe8909448ffa26278dd3c7e535cdb554d721"
 dependencies = [
  "bytemuck",
+]
+
+[[package]]
+name = "emdock"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "egui",
 ]
 
 [[package]]
