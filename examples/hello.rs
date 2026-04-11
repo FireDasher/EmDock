@@ -1,5 +1,4 @@
 use eframe::egui;
-use egui::Id;
 use emdock::{node::Node, tree::Tree};
 
 fn main() {
@@ -15,18 +14,13 @@ impl MyEguiApp {
 	fn new(cc: &eframe::CreationContext<'_>) -> Self {
 		cc.egui_ctx.set_visuals(egui::Visuals::dark());
 		// Directly make the layout just for prototyping
-		Self{ tiles: Tree{
-				root: Box::new(Node::VSplit {
-					ratio: 0.5,
-					top: Box::new(Node::HSplit {
-						ratio: 0.3,
-						left: Box::new(Node::Leaf { tabs: vec![Id::new("Hello"), Id::new("Ohio")], active: 0 }),
-						right: Box::new(Node::Leaf { tabs: vec![Id::new("Rizz")], active: 0 })
-					}),
-					bottom: Box::new(Node::Leaf { tabs: vec![Id::new("KOLJDFSKLIHFGKSGDHKJFGFSGFG")], active: 0 })
-				}),
-			}
-		}
+		Self{ tiles: Tree(vec![
+			Node::hsplit(0.5),
+				Node::vsplit(0.6),
+				Node::leaf(&["KOLJDFSKLIHFGKSGDHKJFGFSGFG"]),
+					Node::leaf(&["Page"]),
+					Node::leaf(&["Hello", "Foo"]),
+		]) }
 	}
 }
 
@@ -35,22 +29,22 @@ impl eframe::App for MyEguiApp {
 		tiles.add("Hello", |ui| {
 			ui.heading("World");
 		});
-		tiles.add("Ohio", |ui| {
-			ui.heading("Skibidi ohio rizz gyatt!!!!!!!");
-			ui.button("Skizz").clicked();
+		tiles.add("Foo", |ui| {
+			ui.heading("B A R");
+			ui.button("Baz").clicked();
 		});
-		tiles.add("Rizz", |ui| {
-			ui.heading("Gyatt");
-			ui.button("DJOLFGHidjksygh").clicked();
-			ui.button("dfg").clicked();
-			ui.button("fg").clicked();
-			ui.button("dfgsgsdfgsds").clicked();
+		tiles.add("Page", |ui| {
+			ui.heading("This is very a page");
+			ui.button("Button").clicked();
+			ui.button("Button").clicked();
+			ui.button("Button").clicked();
+			ui.button("Button").clicked();
 		});
 		tiles.add("KOLJDFSKLIHFGKSGDHKJFGFSGFG", |ui| {
-			ui.heading("Gyatt");
-			ui.heading("Gyatt");
-			ui.heading("Gyatt");
-			ui.heading("Gyatt");
+			ui.heading("FJISGHUFYtgruifghuisdhfgui");
+			ui.heading("$Y*#%^&*^%&*^$#&*%^&*#$%^*&#$^*%");
+			ui.heading("SFihuisfguyrgiyuhdflHJKGFYhryugf");
+			ui.heading("úíüúéígé");
 			ui.heading("Gyatt");
 		});
 	});}
