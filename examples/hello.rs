@@ -44,8 +44,8 @@ impl eframe::App for MyEguiApp {
 			ui.heading("FJISGHUFYtgruifghuisdhfgui");
 			ui.heading("$Y*#%^&*^%&*^$#&*%^&*#$%^*&#$^*%");
 			ui.heading("SFihuisfguyrgiyuhdflHJKGFYhryugf");
-			ui.heading("úíüúéígé");
-			ui.heading("Gyatt");
+			ui.heading("úíüúéígéüíóéüáíóáéüíóáíóáéüíóáéüíó");
+			ui.heading("97867578678568726578623879568237465");
 		});
 	});}
 }
