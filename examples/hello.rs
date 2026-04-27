@@ -1,51 +1,69 @@
 use eframe::egui;
-use emdock::{node::Node, tree::Tree};
+use emdock::Tree;
 
 fn main() {
 	let native_options = eframe::NativeOptions::default();
-	eframe::run_native("My egui App", native_options, Box::new(|cc| Ok(Box::new(MyEguiApp::new(cc))))).unwrap();
+
+	let mut tree: Tree<State> = Tree::new();
+
+	// layout
+	{
+		let (left, right) = tree.hsplit(0, 0.5);
+			let (top, bottom) = tree.vsplit(left, 0.6);
+				tree.tab(top, "Page".into(), State::page);
+				tree.tab(bottom, "Hello".into(), State::hello);
+				tree.tab(bottom, "Foo".into(), State::foo);
+			tree.tab(right, "KOLJDFSKLIHFGKSGDHKJFGFSGFG".into(), State::keysmash);
+	}
+
+	// state
+	let mut state = State::default();
+
+	eframe::run_ui_native("My egui App", native_options, move |ui, _frame| {
+		tree.show(&mut state, ui);
+	}).unwrap();
 }
 
-struct MyEguiApp {
-	tiles: Tree,
+struct State {
+	amount: i64, // allow massive values
+	counter: i64, // allow massive values
 }
 
-impl MyEguiApp {
-	fn new(cc: &eframe::CreationContext<'_>) -> Self {
-		cc.egui_ctx.set_visuals(egui::Visuals::dark());
-		// Directly make the layout just for prototyping
-		Self{ tiles: Tree(vec![
-			Node::hsplit(0.5),
-				Node::vsplit(0.6),
-				Node::leaf(&["KOLJDFSKLIHFGKSGDHKJFGFSGFG"]),
-					Node::leaf(&["Page"]),
-					Node::leaf(&["Hello", "Foo"]),
-		]) }
+impl Default for State {
+	fn default() -> Self {
+    	Self {amount: 2, counter: 1}
 	}
 }
 
-impl eframe::App for MyEguiApp {
-	fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {self.tiles.show(ui, |tiles| {
-		tiles.add("Hello", |ui| {
-			ui.heading("World");
-		});
-		tiles.add("Foo", |ui| {
-			ui.heading("B A R");
-			ui.button("Baz").clicked();
-		});
-		tiles.add("Page", |ui| {
-			ui.heading("This is very a page");
-			ui.button("Button").clicked();
-			ui.button("Button").clicked();
-			ui.button("Button").clicked();
-			ui.button("Button").clicked();
-		});
-		tiles.add("KOLJDFSKLIHFGKSGDHKJFGFSGFG", |ui| {
-			ui.heading("FJISGHUFYtgruifghuisdhfgui");
-			ui.heading("$Y*#%^&*^%&*^$#&*%^&*#$%^*&#$^*%");
-			ui.heading("SFihuisfguyrgiyuhdflHJKGFYhryugf");
-			ui.heading("úíüúéígéüíóéüáíóáéüíóáíóáéüíóáéüíó");
-			ui.heading("97867578678568726578623879568237465");
-		});
-	});}
+impl State {
+	fn hello(&mut self, ui: &mut egui::Ui) {
+		ui.heading("World");
+	}
+	fn foo(&mut self, ui: &mut egui::Ui) {
+		ui.heading("B A R");
+		if ui.button("Baz").clicked() {
+			tfd::MessageBox::new("BaZ", "Quux").run_modal_yes_no_cancel(tfd::YesNoCancel::Yes);
+		};
+	}
+	fn page(&mut self, ui: &mut egui::Ui) {
+		ui.heading("This is very a page");
+
+		ui.label("Amount: ");
+		ui.add(egui::DragValue::new(&mut self.amount));
+
+		if ui.button("*").clicked() { self.counter *= self.amount };
+		if ui.button("/").clicked() { self.counter /= self.amount };
+		if ui.button("+").clicked() { self.counter += self.amount };
+		if ui.button("-").clicked() { self.counter -= self.amount };
+	}
+	fn keysmash(&mut self, ui: &mut egui::Ui) {
+		ui.heading("FJISGHUFYtgruifghuisdhfgui");
+		ui.heading("$Y*#%^&*^%&*^$#&*%^&*#$%^*&#$^*%");
+		ui.heading("SFihuisfguyrgiyuhdflHJKGFYhryugf");
+		ui.heading("úíüúéígéüíóéüáíóáéüíóáíóáéüíóáéüíó");
+		ui.heading("97867578678568726578623879568237465");
+
+		ui.label(egui::RichText::new("Counter").size(100.0).strong());
+		ui.label(self.counter.to_string());
+	}
 }

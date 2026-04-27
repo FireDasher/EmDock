@@ -1,10 +1,15 @@
-use egui::{Id, Rect};
+use egui::Rect;
+
+pub struct Pane<State>{
+	pub title: String,
+	pub ui: fn(&mut State, &mut egui::Ui),
+}
 
 // This is the hierarcheal format that stores the tree state
-pub enum Node {
+pub enum Node<State> {
 	None,
 	Leaf {
-		tabs: Vec<Id>, // Id's of the tabs
+		tabs: Vec<Pane<State>>, // the tabs
 		active: usize, // selected tab
 		rect: Rect, // storing this is nessasary for the flat array format
 	},
@@ -17,12 +22,12 @@ pub enum Node {
 		rect: Rect,
 	}
 }
-impl Default for Node {fn default() -> Self {Self::None}}
+impl<State> Default for Node<State> {fn default() -> Self {Self::None}}
 
-impl Node {
+impl<State> Node<State> {
 	// Convenience functions
-	pub fn leaf(tabs: &[&str]) -> Self {
-		Self::Leaf { tabs: tabs.into_iter().map(|e| Id::new(e)).collect(), active: 0, rect: Rect::EVERYTHING }
+	pub fn leaf(first_tab: Pane<State>) -> Self {
+		Self::Leaf { tabs: vec![first_tab], active: 0, rect: Rect::EVERYTHING }
 	}
 	pub fn hsplit(ratio: f32) -> Self {
 		Self::HSplit { ratio, rect: Rect::EVERYTHING }

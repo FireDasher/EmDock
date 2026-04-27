@@ -8,3 +8,4 @@ egui = "0.34.1"
 
 [dev-dependencies]
 eframe = "0.34.1"
+tfd = "0.1.0"

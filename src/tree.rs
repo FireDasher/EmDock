@@ -1,6 +1,6 @@
 use egui::{Align, Color32, CornerRadius, CursorIcon, FontId, Layout, Rect, Sense, Ui, UiBuilder, pos2, vec2};
 
-use crate::{builder::TileBuilder, node::Node};
+use crate::node::{Node, Pane};
 
 // Binary tree representing relationships of Nodes
 // The root is always 0
@@ -8,23 +8,58 @@ use crate::{builder::TileBuilder, node::Node};
 // - left /top    child of n is n * 2 + 1
 // - right/bottom child of n is n * 2 + 2
 // - parent       node  of n is (n - 1) / 2 (the result is floored because of integer division)
-pub struct Tree(pub Vec<Node>);
+pub struct Tree<State>(Vec<Node<State>>);
 
-impl Default for Tree {
+impl<State> Default for Tree<State> {
 	fn default() -> Self {
 		Self::new()
 	}
 }
 
-impl Tree {
+impl<State> Tree<State> {
 	pub fn new() -> Self {
 		Self(Vec::new())
 	}
 
-	pub fn show(&mut self, ui: &mut Ui, add_tiles: impl FnOnce(&mut TileBuilder)) {
-		let mut builder = TileBuilder::new();
-		add_tiles(&mut builder); // collect tiles
+	// functions for making the starting layout
 
+	/// Creates a new horizontal split, returning a tuple of the indexes of the left and right panes which can be used in hsplit or vsplit or tab.
+	/// Use 0 as the index for the root
+	pub fn hsplit(&mut self, index: usize, ratio: f32) -> (usize, usize) {
+		if index >= self.0.len() {
+			self.0.resize_with(index + 1, Default::default);
+		}
+		self.0[index] = Node::hsplit(ratio);
+		(index*2 + 1, index*2 + 2)
+	}
+
+	/// Creates a new vertical split, returning a tuple of the indexes of the top and bottom panes which can be used in hsplit or vsplit or tab.
+	/// Use 0 as the index for the root
+	pub fn vsplit(&mut self, index: usize, ratio: f32) -> (usize, usize) {
+		if index >= self.0.len() {
+			self.0.resize_with(index + 1, Default::default);
+		}
+		self.0[index] = Node::vsplit(ratio);
+		(index*2 + 1, index*2 + 2)
+	}
+
+	/// Creates a leaf node if there is no leaf node here yet, or adds a tab to the existing leaf node if there is.
+	/// Use 0 as tghe index for theroot
+	pub fn tab(&mut self, index: usize, title: String, ui: fn(&mut State, &mut egui::Ui)) {
+		if let Some(Node::Leaf { tabs, .. }) = self.0.get_mut(index) {
+			tabs.push(Pane{title, ui});
+		} else {
+			if index >= self.0.len() {
+				self.0.resize_with(index + 1, Default::default);
+			}
+			self.0[index] = Node::leaf(Pane{title, ui});
+		}
+	}
+
+	// the massive funcion that makes it all work
+
+	/// Renders this tree, you give it the state that should be passed to the panes and the UI and it renders the panels for you.
+	pub fn show(&mut self, state: &mut State, ui: &mut Ui) {
 		for i in 0..self.0.len() {
 			match &mut self.0[i] {
 				Node::None => (),
@@ -54,8 +89,7 @@ impl Tree {
 						for (i, tab) in tabs.iter().enumerate() {
 							// text
 							const FONT: FontId = FontId::proportional(14.0);
-							let title = builder.0.get(tab).map(|(s,_)| s as &str).unwrap_or("?");
-							let galley = ui.painter().layout_no_wrap(title.to_string(), FONT, ui.visuals().widgets.active.fg_stroke.color);
+							let galley = ui.painter().layout_no_wrap(tab.title.clone() /* why don't they just make this take a reference */, FONT, ui.visuals().widgets.active.fg_stroke.color);
 							// the thing
 							let (tab, response) = ui.allocate_at_least(vec2(galley.size().x + 16.0, TAB_BAR_HEIGHT), Sense::click_and_drag());
 							let response = response.on_hover_cursor(CursorIcon::PointingHand);
@@ -74,13 +108,11 @@ impl Tree {
 						}
 					}
 
-					if let Some(id) = tabs.get(*active) {
-						if let Some(f) = builder.0.remove(id) {
-							let rect = rect.intersect(Rect::everything_below(tab_y));
-							ui.painter().rect_filled(rect, 0, ui.visuals().window_fill);
-							let mut ui = ui.new_child(UiBuilder::new().max_rect(rect.shrink(10.0))); // add a bit of padding
-							f.1(&mut ui);
-						}
+					if let Some(pane) = tabs.get(*active) {
+						let rect = rect.intersect(Rect::everything_below(tab_y));
+						ui.painter().rect_filled(rect, 0, ui.visuals().window_fill);
+						let mut ui = ui.new_child(UiBuilder::new().max_rect(rect.shrink(10.0))); // add a bit of padding
+						(pane.ui)(state, &mut ui);
 					}
 				}
 				Node::HSplit { ratio, rect } => {
