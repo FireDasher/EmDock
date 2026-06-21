@@ -1,5 +1,6 @@
 use eframe::egui;
 use emdock::Tree;
+use tfd::YesNoCancel;
 
 fn main() {
 	let native_options = eframe::NativeOptions::default();
@@ -39,10 +40,17 @@ impl State {
 	fn hello(&mut self, ui: &mut egui::Ui) {
 		ui.heading("World");
 	}
+	fn do_the_dialogue_thing(message: String) {
+		match tfd::MessageBox::new("BaZ", &message).run_modal_yes_no_cancel(YesNoCancel::Yes) {
+			YesNoCancel::Yes => Self::do_the_dialogue_thing(if message == "Quux" {"Quux :)".to_string()} else {message + ")"}),
+			YesNoCancel::No =>  tfd::MessageBox::new("BaZ", ":(").with_icon(tfd::MessageBoxIcon::Warning).run_modal(),
+			YesNoCancel::Cancel => (),
+		}
+	}
 	fn foo(&mut self, ui: &mut egui::Ui) {
 		ui.heading("B A R");
 		if ui.button("Baz").clicked() {
-			tfd::MessageBox::new("BaZ", "Quux").run_modal_yes_no_cancel(tfd::YesNoCancel::Yes);
+			Self::do_the_dialogue_thing("Quux".to_string());
 		};
 	}
 	fn page(&mut self, ui: &mut egui::Ui) {
