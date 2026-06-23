@@ -1,6 +1,5 @@
 use eframe::egui;
 use emdock::Tree;
-use tfd::YesNoCancel;
 
 fn main() {
 	let native_options = eframe::NativeOptions::default();
@@ -40,17 +39,10 @@ impl State {
 	fn hello(&mut self, ui: &mut egui::Ui) {
 		ui.heading("World");
 	}
-	fn do_the_dialogue_thing(message: String) {
-		match tfd::MessageBox::new("BaZ", &message).run_modal_yes_no_cancel(YesNoCancel::Yes) {
-			YesNoCancel::Yes => Self::do_the_dialogue_thing(if message == "Quux" {"Quux :)".to_string()} else {message + ")"}),
-			YesNoCancel::No =>  tfd::MessageBox::new("BaZ", ":(").with_icon(tfd::MessageBoxIcon::Warning).run_modal(),
-			YesNoCancel::Cancel => (),
-		}
-	}
 	fn foo(&mut self, ui: &mut egui::Ui) {
 		ui.heading("B A R");
-		if ui.button("Baz").clicked() {
-			Self::do_the_dialogue_thing("Quux".to_string());
+		if ui.button("Baz").is_pointer_button_down_on() {
+			ui.heading("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras leo mi, auctor vitae dui at, rutrum egestas purus. Proin nulla dui, auctor eget leo vel, laoreet pellentesque sapien. Donec feugiat eros dolor, non volutpat odio mattis pulvinar. Mauris blandit sem vitae neque tempor pretium. Donec volutpat nulla vitae augue imperdiet, eleifend facilisis velit dignissim. Vivamus semper pharetra luctus. Aenean augue nunc, convallis at commodo eu, auctor sit amet lorem. Interdum et malesuada fames ac ante ipsum primis in faucibus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut sit amet quam molestie, placerat orci ut, commodo lacus. Nam ut accumsan orci. Suspendisse congue mollis eros at aliquet. Mauris arcu erat, finibus sit amet sagittis nec, vehicula vel tortor.");
 		};
 	}
 	fn page(&mut self, ui: &mut egui::Ui) {

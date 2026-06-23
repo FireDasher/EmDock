@@ -1,4 +1,4 @@
-use egui::{Align, Color32, CursorIcon, FontId, Id, LayerId, Layout, Order, Pos2, Rect, Sense, Ui, UiBuilder, emath::fast_midpoint, vec2};
+use egui::{Align, Color32, CursorIcon, FontId, Id, LayerId, Layout, Order, Pos2, Rect, Sense, Stroke, Ui, UiBuilder, emath::fast_midpoint, vec2};
 
 use crate::node::{Node, Pane};
 
@@ -21,6 +21,21 @@ impl<State> Default for Tree<State> {
 #[inline(always)]
 fn centered_position(target_rect: Rect, the_rect: Rect) -> Pos2 {
 	Pos2 { x: fast_midpoint(target_rect.min.x, target_rect.max.x) - fast_midpoint(the_rect.min.x, the_rect.max.x), y: fast_midpoint(target_rect.min.y, target_rect.max.y) - fast_midpoint(the_rect.min.y, the_rect.max.y) }
+}
+
+#[derive(Debug, PartialEq)]
+enum Split {
+	None, Left, Right, Above, Below
+}
+
+struct DragData {
+	itree: usize,
+	itab: usize,
+	pointer: Pos2,
+} struct HoverData {
+	itree: usize,
+	rect: Rect,
+	tabbar_rect: Rect,
 }
 
 impl<State> Tree<State> {
@@ -65,61 +80,75 @@ impl<State> Tree<State> {
 
 	/// Renders this tree, you give it the state that should be passed to the panes and the UI and it renders the panels for you.
 	pub fn show(&mut self, state: &mut State, ui: &mut Ui) {
-		for i in 0..self.tree.len() {
-			match &mut self.tree[i] {
+		const TAB_BAR_HEIGHT: f32 = 32.0;
+		const TAB_HORIZONTAL_PADDING: f32 = 16.0;
+		const TAB_ROUNDNESS: u8 = 4;
+		const SEPERATOR_HALF_WIDTH: f32 = 1.0;
+		const FONT_SIZE: f32 = 14.0;
+		const TAB_PADDING: f32 = 10.0;
+		const HIGHLIGHT_OUTLINE_WIDTH: f32 = 2.0;
+		const HIGHLIGHT_OPACITY: f32 = 0.5;
+
+		let tree_space = ui.max_rect();
+
+		let mut drag_data: Option<DragData> = None;  // Stores currently dragging tab
+		let mut hover_data: Option<HoverData> = None;// Stores currently hovered panel
+		for itree in 0..self.tree.len() {
+			match &mut self.tree[itree] {
 				Node::None => (),
 				Node::Leaf { tabs, active, rect } => {
 					*active = (*active).min(tabs.len().saturating_sub(1)); // make sure tab number is within bounds
 
-					if i == 0 { *rect = ui.content_rect() } // fixes an error
-
-					const TAB_BAR_HEIGHT: f32 = 32.0;
-					const TAB_ROUNDNESS: u8 = 4;
+					if itree == 0 { *rect = tree_space } // fixes an error
 
 					let tab_y = rect.min.y + TAB_BAR_HEIGHT;
 
-					// Tab bar
-					{
-						let rect = rect.intersect(Rect::everything_above(tab_y));
-						let mut ui = ui.new_child(UiBuilder::new().max_rect(rect).layout(Layout::left_to_right(Align::Min)));
+					let tabbar_rect  = rect.intersect(Rect::everything_above(tab_y));
+					let content_rect = rect.intersect(Rect::everything_below(tab_y));
 
-						ui.painter().rect_filled(rect, 0, ui.visuals().faint_bg_color);
+					// Tab bar of tabs
+					{
+						let mut ui = ui.new_child(UiBuilder::new().max_rect(tabbar_rect).layout(Layout::left_to_right(Align::Min)));
+
+						ui.painter().rect_filled(tabbar_rect, 0, ui.visuals().faint_bg_color);
 
 						ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
 
-						for (i, tab) in tabs.iter().enumerate() {
+						for (itab, tab) in tabs.iter().enumerate() {
 							// text
-							const FONT: FontId = FontId::proportional(14.0);
+							const FONT: FontId = FontId::proportional(FONT_SIZE);
 							let galley = ui.painter().layout_no_wrap(tab.title.clone(), FONT, ui.visuals().widgets.active.fg_stroke.color);
 							// the thing
-							let (tab, response) = ui.allocate_at_least(vec2(galley.size().x + 16.0, TAB_BAR_HEIGHT), Sense::drag());
+							let (tab, response) = ui.allocate_at_least(vec2(galley.size().x + TAB_HORIZONTAL_PADDING, TAB_BAR_HEIGHT), Sense::click_and_drag());
 							let visual_tab = tab.shrink2(vec2(2.0, 4.0));
 
 							// selection
-							if response.drag_started() {
-								*active = i;
+							if response.is_pointer_button_down_on() {
+								*active = itab;
 							}
 
-							// manually differntiate clicks and drags so starting a drag also selects the tab because it feels more responsive that way
-							if response.dragged() && let Some(total_drag_delta) = response.total_drag_delta() && total_drag_delta.x*total_drag_delta.x + total_drag_delta.y*total_drag_delta.y > 36.0 && let Some(pos) = ui.pointer_interact_pos() {
+							// no longer manually differntiate clicks and drags so starting a drag also selects the tab because it feels more responsive that way, because using response.is_pointer_button_down_on() instead of response.clicked() does the exact same thing
+							if response.dragged() && let Some(pointer) = ui.pointer_interact_pos() {
 								// Tooltip
 								ui.set_cursor_icon(CursorIcon::Grabbing);
 								ui.set_clip_rect(Rect::EVERYTHING);
 
-								let hover_tab = visual_tab.translate(pos - visual_tab.center());
+								let hover_tab = Rect::from_center_size(pointer, visual_tab.size());
 
-								let paitner = ui.painter().clone().with_layer_id(LayerId::new(Order::Tooltip, Id::new("emdock:dragging_tab")));
+								let paitner = ui.layer_painter(LayerId::new(Order::Tooltip, Id::new("emdock:dragging_tab")));
 								paitner.rect_filled(hover_tab, TAB_ROUNDNESS, ui.visuals().widgets.active.bg_fill);
 								paitner.galley(centered_position(hover_tab, galley.rect), galley, Color32::TRANSPARENT); // fallback colour is useless
+
+								drag_data = Some(DragData { itree, itab, pointer });
 							} else {
 								if response.hovered() {
 									ui.set_cursor_icon(CursorIcon::PointingHand); // the response.on_hover_cursor function returns itself for no reason which sucks and it is inlined anyways so this is way better and does the same thing
 								}
 
 								// draw the actual tab visual
-								ui.set_clip_rect(rect);
+								ui.set_clip_rect(tabbar_rect);
 
-								if *active == i {
+								if *active == itab {
 									ui.painter().rect_filled(visual_tab, TAB_ROUNDNESS, ui.visuals().widgets.active.bg_fill);
 								} else if response.hovered() {
 									ui.painter().rect_filled(visual_tab, TAB_ROUNDNESS, ui.visuals().widgets.noninteractive.weak_bg_fill);
@@ -129,20 +158,24 @@ impl<State> Tree<State> {
 						}
 					}
 
+					// draw tab's contents
 					if let Some(pane) = tabs.get(*active) {
-						let rect = rect.intersect(Rect::everything_below(tab_y));
-						ui.painter().rect_filled(rect, 0, ui.visuals().window_fill);
-						let mut ui = ui.new_child(UiBuilder::new().max_rect(rect.shrink(10.0))); // add a bit of padding
-						ui.set_clip_rect(rect);
+						ui.painter().rect_filled(content_rect, 0, ui.visuals().window_fill);
+						let mut ui = ui.new_child(UiBuilder::new().max_rect(rect.shrink(TAB_PADDING))); // add a bit of padding
+						ui.set_clip_rect(content_rect);
 						(pane.ui)(state, &mut ui);
+					}
+
+					// hover data
+					if let Some(pointer) = ui.pointer_interact_pos() && rect.contains(pointer) {
+						hover_data = Some(HoverData { itree, tabbar_rect, rect: *rect });
 					}
 				}
 				Node::HSplit { ratio, rect } => {
-					if i == 0 { *rect = ui.content_rect() } // fixes an error
+					if itree == 0 { *rect = tree_space } // fixes an error
 
-					const SEPERATOR_WIDTH: f32 = 1.0;
 					let split = rect.min.x + rect.width() ** ratio;
-					let seperator = rect.with_min_x(split - SEPERATOR_WIDTH).with_max_x(split + SEPERATOR_WIDTH);
+					let seperator = rect.with_min_x(split - SEPERATOR_HALF_WIDTH).with_max_x(split + SEPERATOR_HALF_WIDTH);
 					let response = ui.allocate_rect(seperator, Sense::drag()).on_hover_cursor(CursorIcon::ResizeHorizontal);
 
 					*ratio = (*ratio + response.drag_delta().x/rect.width()).clamp(0.1, 0.9);
@@ -154,18 +187,17 @@ impl<State> Tree<State> {
 						ui.painter().rect_filled(seperator, 0, ui.style().visuals.widgets.hovered.bg_stroke.color);
 					}
 
-					let left_rect = rect.intersect(Rect::everything_left_of(split - SEPERATOR_WIDTH));
-					let right_rect = rect.intersect(Rect::everything_right_of(split + SEPERATOR_WIDTH));
+					let left_rect = rect.intersect(Rect::everything_left_of(split - SEPERATOR_HALF_WIDTH));
+					let right_rect = rect.intersect(Rect::everything_right_of(split + SEPERATOR_HALF_WIDTH));
 
-					self.tree[i*2 + 1].set_rect(left_rect);
-					self.tree[i*2 + 2].set_rect(right_rect);
+					self.tree[itree*2 + 1].set_rect(left_rect);
+					self.tree[itree*2 + 2].set_rect(right_rect);
 				}
 				Node::VSplit { ratio, rect } => {
-					if i == 0 { *rect = ui.content_rect() } // fixes an error
+					if itree == 0 { *rect = tree_space } // fixes an error
 
-					const SEPERATOR_WIDTH: f32 = 1.0;
 					let split = rect.min.y + rect.height() ** ratio;
-					let seperator = rect.with_min_y(split - SEPERATOR_WIDTH).with_max_y(split + SEPERATOR_WIDTH);
+					let seperator = rect.with_min_y(split - SEPERATOR_HALF_WIDTH).with_max_y(split + SEPERATOR_HALF_WIDTH);
 					let response = ui.allocate_rect(seperator, Sense::drag()).on_hover_cursor(CursorIcon::ResizeVertical);
 
 					*ratio = (*ratio + response.drag_delta().y/rect.height()).clamp(0.1, 0.9);
@@ -177,13 +209,35 @@ impl<State> Tree<State> {
 						ui.painter().rect_filled(seperator, 0, ui.style().visuals.widgets.hovered.bg_stroke.color);
 					}
 
-					let top_rect = rect.intersect(Rect::everything_above(split - SEPERATOR_WIDTH));
-					let bottom_rect = rect.intersect(Rect::everything_below(split + SEPERATOR_WIDTH));
+					let top_rect = rect.intersect(Rect::everything_above(split - SEPERATOR_HALF_WIDTH));
+					let bottom_rect = rect.intersect(Rect::everything_below(split + SEPERATOR_HALF_WIDTH));
 
-					self.tree[i*2 + 1].set_rect(top_rect);
-					self.tree[i*2 + 2].set_rect(bottom_rect);
+					self.tree[itree*2 + 1].set_rect(top_rect);
+					self.tree[itree*2 + 2].set_rect(bottom_rect);
 				}
 			}
+		}
+		// finally handle the docking
+		if let (Some(DragData { itree, itab, pointer }), Some(HoverData { itree: hover_index, tabbar_rect, rect })) = (drag_data, hover_data) {
+			let center = rect.center();
+			let (split_mode, split_visual_rect) = if tabbar_rect.contains(pointer) {
+				(Split::None, tabbar_rect)
+			} else {
+				match [
+					rect.left_center().distance_sq(pointer),
+					rect.right_center().distance_sq(pointer),
+					rect.center_top().distance_sq(pointer),
+					rect.center_bottom().distance_sq(pointer),
+				].into_iter().enumerate().min_by(|(_, left_distance), (_, right_distance)| left_distance.total_cmp(right_distance)).map(|(i, _)| i).unwrap() {
+					0 => (Split::Left,  rect.intersect(Rect::everything_left_of (center.x))),
+					1 => (Split::Right, rect.intersect(Rect::everything_right_of(center.x))),
+					2 => (Split::Above, rect.intersect(Rect::everything_above   (center.y))),
+					3 => (Split::Below, rect.intersect(Rect::everything_below   (center.y))),
+					_ => unreachable!(),
+				}
+			};
+			// todo split on pointer release
+			ui.layer_painter(LayerId::new(Order::Foreground, Id::new("emdock:split_visual"))).rect(split_visual_rect, 0, ui.visuals().selection.bg_fill.linear_multiply(HIGHLIGHT_OPACITY), Stroke::new(HIGHLIGHT_OUTLINE_WIDTH, ui.visuals().selection.bg_fill), egui::StrokeKind::Inside);
 		}
 	}
 }
