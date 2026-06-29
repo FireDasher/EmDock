@@ -4,6 +4,11 @@ pub struct Pane<State>{
 	pub title: String,
 	pub ui: fn(&mut State, &mut egui::Ui),
 }
+impl<State> std::fmt::Debug for Pane<State> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "<{}>", self.title)
+	}
+}
 
 // This is the hierarcheal format that stores the tree state
 pub enum Node<State> {
@@ -24,6 +29,17 @@ pub enum Node<State> {
 }
 impl<State> Default for Node<State> {fn default() -> Self {Self::None}}
 
+impl<State> std::fmt::Debug for Node<State> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Node::None => write!(f, "None"),
+			Self::Leaf { tabs, active, .. } => write!(f, "Leaf({}){:?}", active, tabs),
+			Self::HSplit { ratio, .. } => write!(f, "HSplit({})", ratio),
+			Self::VSplit { ratio, .. } => write!(f, "VSplit({})", ratio),
+		}
+	}
+}
+
 impl<State> Node<State> {
 	// Convenience functions
 	pub fn leaf(first_tab: Pane<State>) -> Self {
@@ -41,6 +57,31 @@ impl<State> Node<State> {
 		match self {
 			Self::None => (),
 			Self::Leaf { rect, .. } | Self::HSplit { rect, .. } | Self::VSplit { rect, .. } => *rect = new_rect,
+		}
+	}
+	pub(crate) fn remove_tab(&mut self, itab: usize) -> Pane<State> {
+		match self {
+			Self::Leaf { tabs, active, .. } => {
+				if itab <= *active { *active = (*active).saturating_sub(1) }
+				tabs.remove(itab)
+			},
+			_ => unreachable!()
+		}
+	}
+	pub(crate) fn push_tab(&mut self, tab: Pane<State>) {
+		match self {
+			Self::Leaf { tabs, active, .. } => {
+				*active = tabs.len();
+				tabs.push(tab);
+			},
+			_ => unreachable!()
+		}
+	}
+	pub(crate) fn is_empty(&self) -> bool {
+		match self {
+			Self::None => true,
+			Self::Leaf { tabs, .. } => tabs.is_empty(),
+			_ => false,
 		}
 	}
 }
